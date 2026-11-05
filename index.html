@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>طلبات - تجربة المزامنة</title>
+    <title>طلبات - مزامنة وهيستوري</title>
     <style>
         :root {
             --bg-dark: #0f172a;
@@ -401,6 +401,42 @@
         .sync-status { margin: 8px 16px 0; padding: 8px 10px; border-radius: 10px; font-size: .78rem; text-align: center; border: 1px solid var(--border); background: rgba(255,255,255,.04); color: var(--text-muted); }
         .sync-status.online { border-color: #10b981; color: #a7f3d0; background: rgba(16,185,129,.08); }
         .sync-status.offline { border-color: #f59e0b; color: #fde68a; background: rgba(245,158,11,.08); }
+
+        .user-strip {
+            margin: 8px 16px 0;
+            padding: 10px 12px;
+            background: rgba(59,130,246,.08);
+            border: 1px solid #3b82f6;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+            font-size: .8rem;
+        }
+        .user-name { color:#bfdbfe; font-weight:700; }
+        .mini-btn {
+            border: 1px solid var(--border);
+            background:#0f172a; color:#fff; padding:6px 9px; border-radius:8px;
+            cursor:pointer; font-size:.75rem; font-weight:700;
+        }
+        .activity-card {
+            margin:8px 16px 0; padding:10px 12px; border-radius:10px;
+            border:1px solid var(--border); background:rgba(255,255,255,.035);
+            display:flex; justify-content:space-between; gap:10px; align-items:center;
+            font-size:.78rem;
+        }
+        .activity-last { color:var(--text-muted); line-height:1.55; flex:1; }
+        .activity-last strong { color:#f8fafc; }
+        .activity-list { display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow:auto; }
+        .activity-row {
+            padding:9px 10px; border:1px solid var(--border); border-radius:9px; background:#0f172a;
+            font-size:.8rem; line-height:1.5;
+        }
+        .activity-row .who { color:#93c5fd; font-weight:700; }
+        .activity-row .when { color:var(--text-muted); font-size:.72rem; margin-top:3px; }
+
 </style>
 </head>
 <body>
@@ -425,6 +461,17 @@
     </div>
 </header>
 <div id="syncStatus" class="sync-status offline">🟡 وضع محلي — المزامنة بين الأجهزة غير مفعلة بعد</div>
+<div class="user-strip">
+    <div>👤 المستخدم الحالي: <span id="currentUserName" class="user-name">غير محدد</span></div>
+    <button class="mini-btn" type="button" onclick="changeUserName()">تغيير الاسم</button>
+</div>
+<div class="activity-card">
+    <div id="lastActivity" class="activity-last">آخر تعديل: لا يوجد بعد</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="mini-btn" type="button" onclick="openActivityModal()">سجل التعديلات</button>
+        <button class="mini-btn" type="button" onclick="openHistoryModal()">🗂 هيستوري الفواتير</button>
+    </div>
+</div>
 
 <div class="mobile-note">
     📱 على الموبايل: افتح الملف في <b>Chrome</b> على أندرويد أو <b>Safari</b> على iPhone، وليس داخل معاينة واتساب؛ معاينة واتساب قد تمنع أزرار JavaScript من العمل.
@@ -468,8 +515,9 @@
 </div>
 
 <div class="bottom-bar">
-    <button class="btn-action btn-invoice" type="button" onclick="openInvoiceModal()">🧾 مراجعة الفاتورة</button>
-    <button class="btn-action btn-reset" type="button" onclick="resetSession()">تصفير الطلبات</button>
+    <button class="btn-action btn-invoice" type="button" onclick="openInvoiceModal()">🧾 مراجعة</button>
+    <button class="btn-action btn-close-invoice" type="button" onclick="closeAndArchiveInvoice()">🔒 قفل الفاتورة</button>
+    <button class="btn-action btn-reset" type="button" onclick="resetSession()">تصفير</button>
 </div>
 
 <!-- Invoice Modal -->
@@ -483,7 +531,36 @@
         <div class="modal-btns">
             <button class="btn-action btn-share" type="button" onclick="shareToWhatsApp()">📲 إرسال واتساب</button>
             <button class="btn-action btn-copy" type="button" onclick="copySummary()">📋 نسخ الملخص</button>
+            <button class="btn-action btn-close-invoice" type="button" onclick="closeAndArchiveInvoice()">🔒 قفل وحفظ</button>
             <button class="btn-action btn-reset" type="button" onclick="closeInvoiceModal()">إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- Activity Modal -->
+<div class="modal" id="activityModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>🕘 سجل التعديلات</h3>
+            <button type="button" onclick="closeActivityModal()" style="background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;">✕</button>
+        </div>
+        <div id="activityBody" class="activity-list"></div>
+        <div class="modal-btns">
+            <button class="btn-action btn-reset" type="button" onclick="closeActivityModal()">إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- Invoice History Modal -->
+<div class="modal" id="historyModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>🗂 هيستوري الفواتير المقفولة</h3>
+            <button type="button" onclick="closeHistoryModal()" style="background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;">✕</button>
+        </div>
+        <div id="historyBody" class="history-list"></div>
+        <div class="modal-btns">
+            <button class="btn-action btn-reset" type="button" onclick="closeHistoryModal()">إغلاق</button>
         </div>
     </div>
 </div>
@@ -506,6 +583,218 @@ const SHARED_ROOM = "orders-main";
 let sharedDb = null;
 let sharedReady = false;
 let applyingRemoteUpdate = false;
+let currentUserName = localStorage.getItem('orders_user_name_v1') || '';
+let activityEntries = [];
+let invoiceHistory = [];
+const ACTION_PASSWORD = '123456';
+const deviceId = (() => {
+  let id = localStorage.getItem('orders_device_id_v1');
+  if (!id) {
+    id = 'dev-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
+    localStorage.setItem('orders_device_id_v1', id);
+  }
+  return id;
+})();
+
+function ensureUserName() {
+  if (!currentUserName) {
+    const entered = prompt('اكتب اسم المستخدم أو اسم الجهاز علشان نعرف مين عمل التعديل:', '');
+    currentUserName = (entered || '').trim() || 'جهاز بدون اسم';
+    localStorage.setItem('orders_user_name_v1', currentUserName);
+  }
+  const el = document.getElementById('currentUserName');
+  if (el) el.textContent = currentUserName;
+}
+
+function changeUserName() {
+  const entered = prompt('اكتب الاسم الجديد لهذا الجهاز:', currentUserName || '');
+  if (entered === null) return;
+  const clean = entered.trim();
+  if (!clean) return alert('الاسم لا يمكن يكون فاضي');
+  const oldName = currentUserName || 'غير محدد';
+  currentUserName = clean;
+  localStorage.setItem('orders_user_name_v1', currentUserName);
+  document.getElementById('currentUserName').textContent = currentUserName;
+  logActivity('تغيير اسم الجهاز', `${oldName} ← ${currentUserName}`);
+}
+
+function formatActivityTime(ts) {
+  if (!ts) return '';
+  try {
+    return new Date(ts).toLocaleString('ar-EG', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  } catch (_) { return ''; }
+}
+
+function renderActivity() {
+  const last = document.getElementById('lastActivity');
+  const body = document.getElementById('activityBody');
+  const entries = activityEntries.slice().sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+  if (last) {
+    if (!entries.length) last.textContent = 'آخر تعديل: لا يوجد بعد';
+    else {
+      const a=entries[0];
+      last.innerHTML = `آخر تعديل: <strong>${a.user || 'غير معروف'}</strong> — ${a.action || ''}${a.details ? ' (' + a.details + ')' : ''}`;
+    }
+  }
+  if (body) {
+    body.innerHTML = entries.length ? entries.map(a => `
+      <div class="activity-row">
+        <div><span class="who">${escapeHtml(a.user || 'غير معروف')}</span> — ${escapeHtml(a.action || '')}</div>
+        ${a.details ? `<div>${escapeHtml(a.details)}</div>` : ''}
+        <div class="when">${formatActivityTime(a.timestamp)}</div>
+      </div>`).join('') : '<div style="text-align:center;color:#94a3b8;padding:20px">لا توجد تعديلات مسجلة بعد.</div>';
+  }
+}
+
+function escapeHtml(v) {
+  return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+}
+
+function logActivity(action, details='') {
+  const entry = {
+    user: currentUserName || 'جهاز بدون اسم',
+    deviceId, action, details,
+    timestamp: Date.now()
+  };
+  if (sharedReady && sharedDb) {
+    sharedDb.ref('rooms/' + SHARED_ROOM + '/activity').push({
+      ...entry,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    });
+  } else {
+    activityEntries.unshift(entry);
+    activityEntries = activityEntries.slice(0,50);
+    localStorage.setItem('orders_activity_local_v1', JSON.stringify(activityEntries));
+    renderActivity();
+  }
+}
+
+function openActivityModal() { renderActivity(); document.getElementById('activityModal').classList.add('open'); }
+function closeActivityModal() { document.getElementById('activityModal').classList.remove('open'); }
+
+function verifyActionPassword(actionName) {
+  const entered = prompt(`اكتب باسورد ${actionName}:`);
+  if (entered === null) return false;
+  if (entered !== ACTION_PASSWORD) {
+    alert('الباسورد غير صحيح');
+    return false;
+  }
+  return true;
+}
+
+function getLiveTimerMs() {
+  return timerElapsed + (timerRunning ? (Date.now() - timerStart) : 0);
+}
+
+function getInvoiceSnapshot() {
+  const active = items.filter(i => Number(i.qty) > 0).map(i => ({
+    id:i.id, name:i.name, qty:Number(i.qty), ourPrice:Number(i.ourPrice), cafePrice:Number(i.cafePrice), note:i.note || ''
+  }));
+  let totalOur=0,totalCafe=0,totalCount=0;
+  active.forEach(i => {
+    totalOur += i.qty*i.ourPrice;
+    totalCafe += i.qty*i.cafePrice;
+    totalCount += i.qty;
+  });
+  return {
+    items: active,
+    totalOur: Math.round(totalOur*100)/100,
+    totalCafe: Math.round(totalCafe*100)/100,
+    totalDiff: Math.round((totalCafe-totalOur)*100)/100,
+    totalCount: Math.round(totalCount*100)/100,
+    playstationMs: getLiveTimerMs(),
+    closedBy: currentUserName || 'جهاز بدون اسم',
+    deviceId,
+    closedAt: Date.now()
+  };
+}
+
+function renderInvoiceHistory() {
+  const body=document.getElementById('historyBody');
+  if (!body) return;
+  const arr=invoiceHistory.slice().sort((a,b)=>(b.closedAt||0)-(a.closedAt||0));
+  if (!arr.length) {
+    body.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px">لا توجد فواتير مقفولة حتى الآن.</div>';
+    return;
+  }
+  body.innerHTML=arr.map((inv,idx)=>{
+    const lines=(inv.items||[]).map(i=>`<div>• ${escapeHtml(i.name)} — ${i.qty} × ${i.ourPrice} ج = <strong>${(i.qty*i.ourPrice).toFixed(2).replace('.00','')} ج</strong></div>`).join('');
+    return `<div class="history-card">
+      <div class="history-head">
+        <div>
+          <div class="history-title">فاتورة #${escapeHtml(inv.invoiceNo || String(arr.length-idx))}</div>
+          <div class="history-meta">قفلها: ${escapeHtml(inv.closedBy || 'غير معروف')}<br>${formatActivityTime(inv.closedAt)}</div>
+        </div>
+        <div class="history-total">${Number(inv.totalOur||0).toFixed(2).replace('.00','')} ج</div>
+      </div>
+      <div class="history-meta">قبل التعديل: ${Number(inv.totalCafe||0).toFixed(2).replace('.00','')} ج — فرق الأسعار: ${Number(inv.totalDiff||0).toFixed(2).replace('.00','')} ج</div>
+      <div class="history-items">${lines || 'لا توجد أصناف'}</div>
+    </div>`;
+  }).join('');
+}
+function openHistoryModal(){ renderInvoiceHistory(); document.getElementById('historyModal').classList.add('open'); }
+function closeHistoryModal(){ document.getElementById('historyModal').classList.remove('open'); }
+
+function clearCurrentSessionNoPassword(logIt=true) {
+  items.forEach(i => i.qty=0);
+  timerRunning=false;
+  clearInterval(timerInterval);
+  timerElapsed=0;
+  timerStart=0;
+  localStorage.removeItem('orders_timer_start_v3');
+  localStorage.setItem('orders_timer_elapsed_v3','0');
+  const btn=document.getElementById('btnToggleTimer');
+  if (btn) { btn.innerText='تشغيل'; btn.className='btn-timer btn-start'; }
+  const disp=document.getElementById('psTimer'); if (disp) disp.innerText='00:00:00';
+  saveState();
+  pushTimerState();
+  renderItems();
+  if (logIt) logActivity('تصفير الطلبات','تم تصفير كل الطلبات وعداد البلايستيشن');
+}
+
+async function closeAndArchiveInvoice() {
+  const anyOrders = items.some(i => Number(i.qty)>0);
+  const liveTimerMs = getLiveTimerMs();
+  if (!anyOrders && liveTimerMs<=0) { alert('مفيش طلبات أو وقت بلايستيشن لقفل الفاتورة'); return; }
+  if (!verifyActionPassword('قفل الفاتورة')) return;
+  if (!confirm('متأكد إنك عايز تقفل الفاتورة وتحفظها في الهيستوري ثم تصفر القعدة؟')) return;
+
+  // وقف العداد واحسبه تلقائياً داخل الفاتورة قبل الحفظ
+  if (liveTimerMs > 0) {
+    timerRunning=false;
+    timerElapsed=liveTimerMs;
+    timerStart=0;
+    clearInterval(timerInterval);
+    localStorage.setItem('orders_timer_elapsed_v3',timerElapsed);
+    localStorage.removeItem('orders_timer_start_v3');
+    const psItem=items.find(i=>i.id===3);
+    if (psItem) psItem.qty=Math.round((liveTimerMs/3600000)*100)/100;
+    saveState();
+    pushTimerState();
+    renderItems();
+  }
+
+  const snapshot=getInvoiceSnapshot();
+  snapshot.invoiceNo = new Date(snapshot.closedAt).toISOString().replace(/[-:TZ.]/g,'').slice(0,14);
+  try {
+    if (sharedReady && sharedDb) {
+      const ref=sharedDb.ref('rooms/'+SHARED_ROOM+'/invoices').push();
+      await ref.set({...snapshot, closedAt:firebase.database.ServerValue.TIMESTAMP});
+    } else {
+      invoiceHistory.unshift(snapshot);
+      invoiceHistory=invoiceHistory.slice(0,100);
+      localStorage.setItem('orders_invoice_history_v1',JSON.stringify(invoiceHistory));
+      renderInvoiceHistory();
+    }
+    logActivity('قفل فاتورة', `فاتورة ${snapshot.invoiceNo} — ${snapshot.totalOur} ج`);
+    closeInvoiceModal();
+    clearCurrentSessionNoPassword(false);
+    alert('تم قفل الفاتورة وحفظها في الهيستوري وتصفير القعدة');
+  } catch(e) {
+    console.error(e);
+    alert('حصل خطأ أثناء حفظ الفاتورة. لم يتم تصفير القعدة.');
+  }
+}
 
 function firebaseConfigured() {
   return !!(firebaseConfig.apiKey && firebaseConfig.databaseURL && firebaseConfig.projectId && firebaseConfig.appId);
@@ -530,6 +819,18 @@ function initSharedSync() {
     const roomRef = sharedDb.ref('rooms/' + SHARED_ROOM);
     sharedReady = true;
     setSyncStatus('🟢 مزامنة مباشرة مفعلة — أي تعديل سيظهر على كل الأجهزة', true);
+
+    roomRef.child('activity').limitToLast(50).on('value', snap => {
+      const val = snap.val() || {};
+      activityEntries = Object.entries(val).map(([key, a]) => ({ key, ...a }));
+      renderActivity();
+    });
+
+    roomRef.child('invoices').limitToLast(100).on('value', snap => {
+      const val=snap.val() || {};
+      invoiceHistory=Object.entries(val).map(([key,inv])=>({key,...inv}));
+      renderInvoiceHistory();
+    });
 
     roomRef.child('items').on('value', snap => {
       const remoteItems = snap.val();
@@ -693,9 +994,12 @@ function renderItems() {
 function changeQty(id, delta) {
     const item = items.find(i => i.id === id);
     if (!item) return;
+    const before = item.qty;
     item.qty = Math.max(0, Math.round((item.qty + delta) * 10) / 10);
+    if (item.qty === before) return;
     saveState();
     renderItems();
+    logActivity(delta > 0 ? 'زيادة طلب' : 'نقص طلب', `${item.name}: ${before} ← ${item.qty}`);
 }
 
 function editItemPrice(id) {
@@ -703,9 +1007,11 @@ function editItemPrice(id) {
     if (!item) return;
     const newOur = prompt(`تعديل السعر المتفق عليه لـ "${item.name}":`, item.ourPrice);
     if (newOur !== null && !isNaN(newOur) && newOur !== '') {
+        const oldPrice = item.ourPrice;
         item.ourPrice = parseFloat(newOur);
         saveState();
         renderItems();
+        logActivity('تعديل سعر', `${item.name}: ${oldPrice} ج ← ${item.ourPrice} ج`);
     }
 }
 
@@ -740,23 +1046,13 @@ function addCustomItem() {
     document.getElementById('newCafePrice').value = '';
     saveState();
     renderItems();
+    logActivity('إضافة صنف جديد', `${name} — ${ourPrice} ج`);
 }
 
 function resetSession() {
-    if (confirm('هل متأكد من تصفير كل الطلبات والعداد لبدء حساب جديد؟')) {
-        items.forEach(i => i.qty = 0);
-        timerRunning = false;
-        clearInterval(timerInterval);
-        timerElapsed = 0;
-        localStorage.removeItem('orders_timer_start_v3');
-        pushTimerState();
-        localStorage.removeItem('orders_timer_elapsed_v3');
-        pushTimerState();
-        document.getElementById('psTimer').innerText = '00:00:00';
-        document.getElementById('btnToggleTimer').innerText = 'تشغيل';
-        saveState();
-        renderItems();
-    }
+    if (!verifyActionPassword('تصفير الطلبات')) return;
+    if (!confirm('هل متأكد من تصفير كل الطلبات والعداد؟ الفاتورة الحالية لن تُحفظ في الهيستوري.')) return;
+    clearCurrentSessionNoPassword(true);
 }
 
 // Timer Functions
@@ -782,6 +1078,7 @@ function toggleTimer() {
         btn.innerText = 'إيقاف مؤقت';
         btn.className = 'btn-timer btn-pause';
         timerInterval = setInterval(updateTimerDisplay, 1000);
+        logActivity('تشغيل عداد البلايستيشن', 'بدأ العداد');
     } else {
         timerRunning = false;
         timerElapsed += (Date.now() - timerStart);
@@ -791,6 +1088,7 @@ function toggleTimer() {
         btn.innerText = 'استئناف';
         btn.className = 'btn-timer btn-start';
         clearInterval(timerInterval);
+        logActivity('إيقاف عداد البلايستيشن مؤقتًا', document.getElementById('psTimer').innerText);
     }
 }
 
@@ -808,6 +1106,7 @@ function addManualTime() {
     document.getElementById('manualHours').value = '';
     document.getElementById('manualMinutes').value = '';
     updateTimerDisplay();
+    logActivity('إضافة وقت يدوي للبلايستيشن', `${h} ساعة و ${m} دقيقة`);
 }
 
 function syncTimerToPS() {
@@ -823,6 +1122,7 @@ function syncTimerToPS() {
         saveState();
         renderItems();
         alert(`تم تحديث عدد ساعات البلايستيشن إلى ${hours} ساعة`);
+        logActivity('إضافة وقت البلايستيشن للفاتورة', `${hours} ساعة`);
     }
 }
 
@@ -948,6 +1248,11 @@ if (timerStart > 0) {
     document.getElementById('btnToggleTimer').className = 'btn-timer btn-pause';
     timerInterval = setInterval(updateTimerDisplay, 1000);
 }
+activityEntries = JSON.parse(localStorage.getItem('orders_activity_local_v1') || '[]');
+invoiceHistory = JSON.parse(localStorage.getItem('orders_invoice_history_v1') || '[]');
+ensureUserName();
+renderActivity();
+renderInvoiceHistory();
 updateTimerDisplay();
 renderItems();
 initSharedSync();
