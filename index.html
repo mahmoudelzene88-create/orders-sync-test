@@ -463,6 +463,49 @@
         .search-clear { border:none; background:#334155; color:#fff; padding:10px 12px; border-radius:9px; font-weight:800; cursor:pointer; }
         .search-meta { margin:5px 18px 0; color:var(--text-muted); font-size:.7rem; min-height:1em; }
 
+
+        /* Compact sticky header */
+        header { position: sticky; top: 0; z-index: 40; backdrop-filter: blur(12px); }
+        .header-top { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+        .header-meta { display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap; font-size:.72rem; }
+        .header-meta .sync-status { margin:0; padding:5px 8px; border-radius:999px; width:auto; min-height:0; font-size:.68rem; }
+        .header-user { display:flex; align-items:center; gap:5px; background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:999px; padding:4px 7px; }
+        .header-user .mini-btn { padding:4px 7px; font-size:.66rem; }
+        .header-actions { margin:7px 16px 0; display:flex; gap:7px; }
+        .header-actions .mini-btn { flex:1; text-align:center; }
+        #lastActivity { display:none; }
+        .voice-help { display:none !important; }
+
+        /* Multi-choice voice picker */
+        .voice-choice-btn.selected { background:#10b981; color:#052e23; border-color:#34d399; box-shadow:0 0 0 2px rgba(16,185,129,.18); }
+        .voice-choice-actions { display:flex; gap:7px; margin-top:9px; }
+        .voice-confirm-btn { flex:1; border:none; border-radius:9px; padding:8px 10px; font-weight:900; cursor:pointer; background:#10b981; color:#052e23; }
+        .voice-confirm-btn:disabled { opacity:.45; cursor:not-allowed; }
+        .voice-qty-list { display:grid; gap:8px; width:100%; }
+        .voice-qty-row { display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px solid #334155; background:#111827; border-radius:10px; padding:8px 10px; }
+        .voice-qty-name { flex:1; min-width:0; font-size:.78rem; font-weight:800; color:#e5e7eb; text-align:right; }
+        .voice-qty-control { display:flex; align-items:center; gap:7px; direction:ltr; }
+        .voice-qty-btn { width:31px; height:31px; border-radius:8px; border:1px solid #10b981; background:#0f2a25; color:#d1fae5; font-size:1.05rem; font-weight:900; cursor:pointer; }
+        .voice-qty-btn:disabled { opacity:.35; cursor:not-allowed; }
+        .voice-qty-value { min-width:24px; text-align:center; font-weight:900; color:#f8fafc; }
+        .voice-cancel-btn { border:none; border-radius:9px; padding:8px 10px; font-weight:800; cursor:pointer; background:#334155; color:#fff; }
+
+        /* Collapsible PlayStation at the bottom */
+        .ps-details { margin:14px 16px 88px; border:1px solid #3b82f6; border-radius:12px; overflow:hidden; background:linear-gradient(135deg,#172554,#0f172a); }
+        .ps-details summary { list-style:none; cursor:pointer; padding:11px 13px; display:flex; justify-content:space-between; align-items:center; gap:8px; color:#bfdbfe; font-weight:900; }
+        .ps-details summary::-webkit-details-marker { display:none; }
+        .ps-summary-time { font-family:monospace; color:#fff; font-size:.9rem; }
+        .ps-details .timer-card { margin:0; border:0; border-top:1px solid rgba(59,130,246,.35); border-radius:0; }
+        .ps-floating { position:fixed; right:12px; bottom:76px; z-index:55; display:none; border:1px solid #60a5fa; background:#172554; color:#fff; border-radius:999px; padding:8px 11px; font-weight:900; box-shadow:0 6px 20px rgba(0,0,0,.35); cursor:pointer; font-size:.78rem; }
+        .ps-floating.show { display:block; }
+        @media (max-width:600px){
+          .header-top h1 { font-size:1.05rem; }
+          .header-meta { flex:1; min-width:230px; gap:4px; }
+          .header-meta .sync-status { font-size:.62rem; padding:4px 6px; }
+          .header-user { font-size:.64rem; padding:3px 5px; }
+          .header-user .mini-btn { font-size:.61rem; padding:3px 5px; }
+        }
+
 </style>
 </head>
 <body>
@@ -470,6 +513,10 @@
 <header>
     <div class="header-top">
         <h1>🧾 طلبات</h1>
+        <div class="header-meta">
+            <div id="syncStatus" class="sync-status offline">🟡 وضع محلي</div>
+            <div class="header-user">👤 <span id="currentUserName" class="user-name">غير محدد</span><button class="mini-btn" type="button" onclick="changeUserName()">تغيير</button></div>
+        </div>
     </div>
     <div class="summary-grid">
         <div class="stat-box highlight">
@@ -486,18 +533,11 @@
         </div>
     </div>
 </header>
-<div id="syncStatus" class="sync-status offline">🟡 وضع محلي — المزامنة بين الأجهزة غير مفعلة بعد</div>
-<div class="user-strip">
-    <div>👤 المستخدم الحالي: <span id="currentUserName" class="user-name">غير محدد</span></div>
-    <button class="mini-btn" type="button" onclick="changeUserName()">تغيير الاسم</button>
+<div class="header-actions">
+    <button class="mini-btn" type="button" onclick="openActivityModal()">🕘 سجل التعديلات</button>
+    <button class="mini-btn" type="button" onclick="openHistoryModal()">🗂 هيستوري الفواتير</button>
 </div>
-<div class="activity-card">
-    <div id="lastActivity" class="activity-last">آخر تعديل: لا يوجد بعد</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="mini-btn" type="button" onclick="openActivityModal()">سجل التعديلات</button>
-        <button class="mini-btn" type="button" onclick="openHistoryModal()">🗂 هيستوري الفواتير</button>
-    </div>
-</div>
+<div id="lastActivity" class="activity-last">آخر تعديل: لا يوجد بعد</div>
 
 <div class="smart-tools">
     <div class="tool-card">
@@ -511,30 +551,14 @@
             <button class="voice-btn" type="button" onclick="startVoiceCommand()">🎤</button>
             <button class="voice-btn voice-run" type="button" onclick="executeVoiceCommand()">تنفيذ</button>
         </div>
-        <div class="voice-help">قولها بطريقتك: «شايين وبيبسي»، «هاتلي 3 حمص وفرنساوي» أو «حجر / معسل / قص / سلوم». ولو لفظ مش واضح، هتظهر لك أقرب أصناف كاختيارات سريعة. ولو الميكروفون مش مدعوم، اكتبها واضغط تنفيذ.</div>
         <div id="voiceChoices" class="voice-choices">
             <div id="voiceChoicesTitle" class="voice-choices-title"></div>
             <div id="voiceChoiceList" class="voice-choice-list"></div>
+            <div id="voiceChoiceActions" class="voice-choice-actions" style="display:none;"></div>
         </div>
     </div>
 </div>
 
-<div class="timer-card">
-    <div class="timer-info">
-        <h3>🎮 عداد بلايستيشن (60 ج/ساعة)</h3>
-        <div class="timer-display" id="psTimer">00:00:00</div>
-        <div class="timer-manual">
-            <input type="number" inputmode="numeric" id="manualHours" min="0" placeholder="ساعات">
-            <input type="number" inputmode="numeric" id="manualMinutes" min="0" placeholder="دقائق">
-            <button class="btn-manual" type="button" onclick="addManualTime()">+ وقت يدوي</button>
-        </div>
-        <div class="manual-note">لو شغلت العداد متأخر، أضف الوقت السابق هنا ثم كمل العداد عادي.</div>
-    </div>
-    <div class="timer-controls">
-        <button class="btn-timer btn-start" type="button" id="btnToggleTimer" onclick="toggleTimer()">تشغيل</button>
-        <button class="btn-timer btn-sync" type="button" onclick="syncTimerToPS()">+ أضف للفاتورة</button>
-    </div>
-</div>
 
 <div class="tabs" id="categoryTabs">
     <button class="tab active" onclick="filterCategory('all', this)">الكل</button>
@@ -561,6 +585,28 @@
         <button class="btn-add-custom" onclick="addCustomItem()">إضافة</button>
     </div>
 </div>
+
+<details class="ps-details" id="psSection">
+    <summary onclick="setTimeout(updatePsCompactUI,0)"><span>🎮 البلايستيشن</span><span id="psSummaryTime" class="ps-summary-time">00:00:00</span></summary>
+
+<div class="timer-card">
+    <div class="timer-info">
+        <h3>🎮 عداد بلايستيشن (60 ج/ساعة)</h3>
+        <div class="timer-display" id="psTimer">00:00:00</div>
+        <div class="timer-manual">
+            <input type="number" inputmode="numeric" id="manualHours" min="0" placeholder="ساعات">
+            <input type="number" inputmode="numeric" id="manualMinutes" min="0" placeholder="دقائق">
+            <button class="btn-manual" type="button" onclick="addManualTime()">+ وقت يدوي</button>
+        </div>
+        <div class="manual-note">لو شغلت العداد متأخر، أضف الوقت السابق هنا ثم كمل العداد عادي.</div>
+    </div>
+    <div class="timer-controls">
+        <button class="btn-timer btn-start" type="button" id="btnToggleTimer" onclick="toggleTimer()">تشغيل</button>
+        <button class="btn-timer btn-sync" type="button" onclick="syncTimerToPS()">+ أضف للفاتورة</button>
+    </div>
+</div>
+</details>
+<button id="psFloating" class="ps-floating" type="button" onclick="openPsSection()">🎮 شغال <span id="psFloatingTime">00:00:00</span></button>
 
 <div class="bottom-bar">
     <button class="btn-action btn-invoice" type="button" onclick="openInvoiceModal()">🧾 مراجعة</button>
@@ -1373,18 +1419,24 @@ function parseOrderCommand(raw){
   }
   return result.sort((a,b)=>(a.start??9999)-(b.start??9999));
 }
+let pendingVoiceChoiceState=null;
 function clearVoiceChoices(){
   const box=document.getElementById('voiceChoices'); if(!box) return;
   box.classList.remove('show');
-  const list=document.getElementById('voiceChoiceList'); if(list) list.innerHTML='';
+  const list=document.getElementById('voiceChoiceList'); if(list){ list.innerHTML=''; list.className='voice-choice-list'; }
+  const actions=document.getElementById('voiceChoiceActions'); if(actions){ actions.innerHTML=''; actions.style.display='none'; }
+  pendingVoiceChoiceState=null;
 }
 function showVoiceChoices(title, ids, qty=1){
   const box=document.getElementById('voiceChoices');
   const ttl=document.getElementById('voiceChoicesTitle');
   const list=document.getElementById('voiceChoiceList');
+  const actions=document.getElementById('voiceChoiceActions');
   if(!box||!ttl||!list) return;
+  pendingVoiceChoiceState=null;
   ttl.textContent=title;
-  list.innerHTML='';
+  list.innerHTML=''; list.className='voice-choice-list';
+  if(actions){actions.innerHTML='';actions.style.display='none';}
   ids.forEach(id=>{
     const item=items.find(i=>Number(i.id)===Number(id)); if(!item) return;
     const b=document.createElement('button'); b.type='button'; b.className='voice-choice-btn';
@@ -1394,20 +1446,87 @@ function showVoiceChoices(title, ids, qty=1){
   });
   box.classList.add('show');
 }
+function showMultiVoiceChoices(title, ids, qty){
+  const box=document.getElementById('voiceChoices');
+  const ttl=document.getElementById('voiceChoicesTitle');
+  const list=document.getElementById('voiceChoiceList');
+  const actions=document.getElementById('voiceChoiceActions');
+  if(!box||!ttl||!list||!actions) return;
+  qty=Math.max(1,Number(qty)||1);
+  pendingVoiceChoiceState={ids:ids.map(Number),qty,counts:{},baseTitle:title};
+  pendingVoiceChoiceState.ids.forEach(id=>pendingVoiceChoiceState.counts[id]=0);
+  list.innerHTML=''; actions.innerHTML='';
+  list.className='voice-choice-list voice-qty-list';
+  ids.forEach(id=>{
+    const item=items.find(i=>Number(i.id)===Number(id)); if(!item) return;
+    const row=document.createElement('div'); row.className='voice-qty-row';
+    const name=document.createElement('div'); name.className='voice-qty-name'; name.textContent=item.name;
+    const control=document.createElement('div'); control.className='voice-qty-control';
+    const minus=document.createElement('button'); minus.type='button'; minus.className='voice-qty-btn'; minus.textContent='−';
+    const value=document.createElement('span'); value.className='voice-qty-value'; value.textContent='0';
+    const plus=document.createElement('button'); plus.type='button'; plus.className='voice-qty-btn'; plus.textContent='+';
+    minus.onclick=()=>adjustMultiVoiceChoiceQty(item.id,-1,value);
+    plus.onclick=()=>adjustMultiVoiceChoiceQty(item.id,1,value);
+    control.append(minus,value,plus); row.append(name,control); list.appendChild(row);
+  });
+  const confirmBtn=document.createElement('button'); confirmBtn.type='button'; confirmBtn.className='voice-confirm-btn'; confirmBtn.textContent='تأكيد الاختيار'; confirmBtn.disabled=true; confirmBtn.onclick=()=>confirmMultiVoiceChoice();
+  const cancel=document.createElement('button'); cancel.type='button'; cancel.className='voice-cancel-btn'; cancel.textContent='إلغاء'; cancel.onclick=clearVoiceChoices;
+  actions.append(confirmBtn,cancel); actions.style.display='flex'; box.classList.add('show');
+  updateMultiVoiceChoiceTitle();
+}
+function getMultiVoiceSelectedTotal(){
+  const st=pendingVoiceChoiceState; if(!st) return 0;
+  return Object.values(st.counts||{}).reduce((a,b)=>a+(Number(b)||0),0);
+}
+function adjustMultiVoiceChoiceQty(id,delta,valueEl){
+  const st=pendingVoiceChoiceState; if(!st) return;
+  id=Number(id); const current=Number(st.counts[id]||0); const total=getMultiVoiceSelectedTotal();
+  if(delta>0 && total>=st.qty) return;
+  st.counts[id]=Math.max(0,current+delta);
+  if(valueEl) valueEl.textContent=String(st.counts[id]);
+  updateMultiVoiceChoiceTitle();
+}
+function updateMultiVoiceChoiceTitle(){
+  const st=pendingVoiceChoiceState, ttl=document.getElementById('voiceChoicesTitle'); if(!st||!ttl)return;
+  const selected=getMultiVoiceSelectedTotal();
+  ttl.textContent=`${st.baseTitle} — المطلوب ${st.qty} | تم اختيار ${selected} | المتبقي ${Math.max(0,st.qty-selected)}`;
+  const confirmBtn=document.querySelector('#voiceChoiceActions .voice-confirm-btn');
+  if(confirmBtn) confirmBtn.disabled=(selected!==st.qty);
+  document.querySelectorAll('#voiceChoiceList .voice-qty-row').forEach(row=>{
+    const plus=row.querySelectorAll('.voice-qty-btn')[1]; if(plus) plus.disabled=selected>=st.qty;
+  });
+}
+function confirmMultiVoiceChoice(){
+  const st=pendingVoiceChoiceState; if(!st) return;
+  const selected=getMultiVoiceSelectedTotal();
+  if(selected!==st.qty) return alert(`كمّل الاختيارات لحد ${st.qty}. المتبقي ${Math.max(0,st.qty-selected)}.`);
+  Object.entries(st.counts).forEach(([id,count])=>{
+    count=Number(count)||0; if(count>0){ const item=items.find(i=>Number(i.id)===Number(id)); if(item) changeQty(item.id,count); }
+  });
+  const input=document.getElementById('voiceCommand'); if(input) input.value='';
+  clearVoiceChoices();
+}
 function detectGenericVoiceIntent(raw){
   let t=detectDualForms(stripFillerWords(raw));
   const toks=t.split(/\s+/).filter(Boolean);
   let qty=1;
   for(const tok of toks){ if(/^\d+$/.test(tok)){qty=Math.max(1,parseInt(tok,10));break;} if(numberWords[tok]){qty=numberWords[tok];break;} }
-  // Remove number words/numbers to judge whether the user only said a broad category.
   const nonQty=toks.filter(tok=>!/^\d+$/.test(tok)&&!numberWords[tok]);
-  const body=nonQty.join(' ');
+  const body=normalizeArabicText(nonQty.join(' '));
   const genericGroups=[
-    {keys:['قهوه','قهوة','كوفي','كوفى'], ids:[8,9,10,11], title:'تقصد أنهي قهوة؟'},
-    {keys:['شاي','شاى'], ids:[4,5,6,7], title:'تقصد أنهي شاي؟'}
+    {keys:['قهوه','قهوة','كوفي','كوفى'], ids:[8,9,10,11], title:'اختار نوع القهوة'},
+    {keys:['شاي','شاى'], ids:[4,5,6,7], title:'اختار نوع الشاي'},
+    {keys:['شيشه','شيشة','معسل','حجر'], ids:[1,2], title:'اختار نوع الشيشة'},
+    {keys:['كوكتيل'], ids:[19,20], title:'اختار نوع الكوكتيل'},
+    {keys:['قرفه','قرفة'], ids:[13,14], title:'اختار نوع القرفة'}
   ];
   for(const g of genericGroups){
-    if(g.keys.some(k=>normalizeArabicText(body)===normalizeArabicText(k))) return {ids:g.ids,qty,title:g.title};
+    if(g.keys.some(k=>body===normalizeArabicText(k))) return {ids:g.ids,qty,title:g.title,multi:g.ids.length>1};
+  }
+  // Generic fallback: if the spoken core appears in multiple visible item names, offer all of them.
+  if(body){
+    const matching=items.filter(i=>normalizeArabicText(i.name).includes(body)).map(i=>Number(i.id));
+    if(matching.length>1) return {ids:matching.slice(0,8),qty,title:`اختار نوع ${nonQty.join(' ')}`,multi:true};
   }
   return null;
 }
@@ -1474,7 +1593,7 @@ function executeVoiceCommand(){
     clearVoiceChoices();
     if(!raw) return alert('اكتب أو قول الطلب الأول');
     const generic=detectGenericVoiceIntent(raw);
-    if(generic){ showVoiceChoices(generic.title,generic.ids,generic.qty); return; }
+    if(generic){ if(generic.qty>1 && generic.ids.length>1) showMultiVoiceChoices(generic.title,generic.ids,generic.qty); else showVoiceChoices(generic.title,generic.ids,generic.qty); return; }
     const hits=parseOrderCommand(raw);
     if(!hits.length){
       // Never dead-end: always offer the nearest items as quick choices.
@@ -1547,7 +1666,11 @@ function updateTimerDisplay() {
     const hrs = String(Math.floor(totalSec / 3600)).padStart(2, '0');
     const mins = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
     const secs = String(totalSec % 60).padStart(2, '0');
-    document.getElementById('psTimer').innerText = `${hrs}:${mins}:${secs}`;
+    const timeText = `${hrs}:${mins}:${secs}`;
+    const main=document.getElementById('psTimer'); if(main) main.innerText=timeText;
+    const sm=document.getElementById('psSummaryTime'); if(sm) sm.innerText=timeText;
+    const fl=document.getElementById('psFloatingTime'); if(fl) fl.innerText=timeText;
+    updatePsCompactUI();
 }
 
 function toggleTimer() {
@@ -1560,6 +1683,8 @@ function toggleTimer() {
         btn.innerText = 'إيقاف مؤقت';
         btn.className = 'btn-timer btn-pause';
         timerInterval = setInterval(updateTimerDisplay, 1000);
+        const ps=document.getElementById('psSection'); if(ps) ps.open=false;
+        updatePsCompactUI();
         logActivity('تشغيل عداد البلايستيشن', 'بدأ العداد');
     } else {
         timerRunning = false;
@@ -1570,8 +1695,20 @@ function toggleTimer() {
         btn.innerText = 'استئناف';
         btn.className = 'btn-timer btn-start';
         clearInterval(timerInterval);
+        updatePsCompactUI();
         logActivity('إيقاف عداد البلايستيشن مؤقتًا', document.getElementById('psTimer').innerText);
     }
+}
+
+function updatePsCompactUI(){
+    const fl=document.getElementById('psFloating');
+    const section=document.getElementById('psSection');
+    if(fl) fl.classList.toggle('show', !!timerRunning && !(section&&section.open));
+}
+function openPsSection(){
+    const section=document.getElementById('psSection'); if(!section) return;
+    section.open=true; updatePsCompactUI();
+    section.scrollIntoView({behavior:'smooth',block:'center'});
 }
 
 function addManualTime() {
@@ -1736,6 +1873,7 @@ ensureUserName();
 renderActivity();
 renderInvoiceHistory();
 updateTimerDisplay();
+updatePsCompactUI();
 renderItems();
 renderQuickAdd();
 refreshConnectionStatus();
