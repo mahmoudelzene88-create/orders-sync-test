@@ -450,6 +450,12 @@
         .voice-btn { border:none; border-radius:9px; padding:8px 11px; font-weight:800; cursor:pointer; color:#fff; background:#8b5cf6; }
         .voice-run { background:#10b981; color:#05140e; }
         .voice-help { margin-top:6px; color:#94a3b8; font-size:.7rem; line-height:1.5; }
+
+        .voice-choices { display:none; margin-top:8px; padding:9px; border:1px solid #334155; border-radius:10px; background:#0b1220; }
+        .voice-choices.show { display:block; }
+        .voice-choices-title { color:#cbd5e1; font-size:.76rem; margin-bottom:7px; }
+        .voice-choice-list { display:flex; flex-wrap:wrap; gap:7px; }
+        .voice-choice-btn { border:1px solid #10b981; background:#0f2a25; color:#d1fae5; border-radius:999px; padding:7px 10px; font-weight:800; cursor:pointer; font-size:.75rem; }
         .pending-badge { display:inline-block; margin-inline-start:6px; padding:2px 7px; border-radius:999px; background:#7c2d12; color:#fed7aa; font-weight:800; }
         .search-wrap { margin:10px 16px 0; display:flex; gap:6px; align-items:center; }
         .search-input { flex:1; min-width:0; background:#0f172a; border:1px solid var(--border); color:#fff; padding:11px 12px; border-radius:10px; font-size:.88rem; outline:none; }
@@ -505,7 +511,11 @@
             <button class="voice-btn" type="button" onclick="startVoiceCommand()">🎤</button>
             <button class="voice-btn voice-run" type="button" onclick="executeVoiceCommand()">تنفيذ</button>
         </div>
-        <div class="voice-help">قولها بطريقتك: «شايين وبيبسي»، «هاتلي 3 حمص وفرنساوي» أو «حجر / معسل / قص / سلوم». ولو الميكروفون مش مدعوم، اكتبها واضغط تنفيذ.</div>
+        <div class="voice-help">قولها بطريقتك: «شايين وبيبسي»، «هاتلي 3 حمص وفرنساوي» أو «حجر / معسل / قص / سلوم». ولو لفظ مش واضح، هتظهر لك أقرب أصناف كاختيارات سريعة. ولو الميكروفون مش مدعوم، اكتبها واضغط تنفيذ.</div>
+        <div id="voiceChoices" class="voice-choices">
+            <div id="voiceChoicesTitle" class="voice-choices-title"></div>
+            <div id="voiceChoiceList" class="voice-choice-list"></div>
+        </div>
     </div>
 </div>
 
@@ -1230,8 +1240,8 @@ const voiceAliases={
   7:['شاي اخضر','شاي أخضر','اخضر','أخضر'],
   8:['قهوه تركي ساده','قهوة تركي سادة','قهوه ساده','قهوة سادة','تركي ساده','تركي سادة','ساده تركي'],
   9:['قهوه تركي مانو','قهوة تركي مانو','تركي مانو','مانو'],
-  10:['قهوه فرنساوي','قهوة فرنساوي','قهوه فرنساوى','قهوة فرنساوى','فرنساوي','فرنساوى','فرنسي'],
-  11:['اسبريسو','اسبرسو','ايسبريسو','اسبريسو سنجل','اسبرسو سنجل','سنجل اسبريسو'],
+  10:['قهوه فرنساوي','قهوة فرنساوي','قهوه فرنساوى','قهوة فرنساوى','فرنساوي','فرنساوى','فرنسي','فرنساوى مظبوط','فرنساوي مظبوط'],
+  11:['اسبريسو','اسبرسو','ايسبريسو','اسبريسو سنجل','اسبرسو سنجل','سنجل اسبريسو','سنجل','اكسبريسو'],
   12:['حمص شام','حمص الشام','حمص','حمص الشام'],
   13:['قرفه بالجنزبيل','قرفة بالجنزبيل','قرفه جنزبيل','قرفة جنزبيل','قرفه زنجبيل','قرفة زنجبيل'],
   14:['قرفه جنزبيل بالحليب','قرفة جنزبيل بالحليب','قرفه بالحليب','قرفة بالحليب','قرفه لبن','قرفة لبن','جنزبيل بالحليب'],
@@ -1363,17 +1373,121 @@ function parseOrderCommand(raw){
   }
   return result.sort((a,b)=>(a.start??9999)-(b.start??9999));
 }
+function clearVoiceChoices(){
+  const box=document.getElementById('voiceChoices'); if(!box) return;
+  box.classList.remove('show');
+  const list=document.getElementById('voiceChoiceList'); if(list) list.innerHTML='';
+}
+function showVoiceChoices(title, ids, qty=1){
+  const box=document.getElementById('voiceChoices');
+  const ttl=document.getElementById('voiceChoicesTitle');
+  const list=document.getElementById('voiceChoiceList');
+  if(!box||!ttl||!list) return;
+  ttl.textContent=title;
+  list.innerHTML='';
+  ids.forEach(id=>{
+    const item=items.find(i=>Number(i.id)===Number(id)); if(!item) return;
+    const b=document.createElement('button'); b.type='button'; b.className='voice-choice-btn';
+    b.textContent=`${qty>1?qty+' × ':''}${item.name}`;
+    b.onclick=()=>{ changeQty(item.id,qty); document.getElementById('voiceCommand').value=''; clearVoiceChoices(); };
+    list.appendChild(b);
+  });
+  box.classList.add('show');
+}
+function detectGenericVoiceIntent(raw){
+  let t=detectDualForms(stripFillerWords(raw));
+  const toks=t.split(/\s+/).filter(Boolean);
+  let qty=1;
+  for(const tok of toks){ if(/^\d+$/.test(tok)){qty=Math.max(1,parseInt(tok,10));break;} if(numberWords[tok]){qty=numberWords[tok];break;} }
+  // Remove number words/numbers to judge whether the user only said a broad category.
+  const nonQty=toks.filter(tok=>!/^\d+$/.test(tok)&&!numberWords[tok]);
+  const body=nonQty.join(' ');
+  const genericGroups=[
+    {keys:['قهوه','قهوة','كوفي','كوفى'], ids:[8,9,10,11], title:'تقصد أنهي قهوة؟'},
+    {keys:['شاي','شاى'], ids:[4,5,6,7], title:'تقصد أنهي شاي؟'}
+  ];
+  for(const g of genericGroups){
+    if(g.keys.some(k=>normalizeArabicText(body)===normalizeArabicText(k))) return {ids:g.ids,qty,title:g.title};
+  }
+  return null;
+}
+function nearestVoiceChoices(text, limit=4){
+  const s=normalizeArabicText(stripFillerWords(detectDualForms(text))).trim();
+  if(!s) return [];
+  const qtyTokens=s.split(/\s+/);
+  const clean=qtyTokens.filter(tok=>!/^\d+$/.test(tok)&&!numberWords[tok]).join(' ').trim() || s;
+  const byId=new Map();
+  const candidates=makeAliasCandidates();
+  candidates.forEach(c=>{
+    let sc=similarity(clean,c.alias);
+    // Reward useful partial word overlap for speech-recognition mistakes.
+    const aWords=new Set(clean.split(/\s+/));
+    const bWords=c.alias.split(/\s+/);
+    const overlap=bWords.filter(w=>aWords.has(w)).length;
+    if(overlap) sc=Math.min(1,sc+Math.min(.18,overlap*.07));
+    const prev=byId.get(c.id);
+    if(!prev||sc>prev.score) byId.set(c.id,{id:c.id,score:sc,alias:c.alias});
+  });
+  // Also compare against the actual visible item name, not aliases only.
+  items.forEach(it=>{
+    const sc=similarity(clean,it.name);
+    const prev=byId.get(Number(it.id));
+    if(!prev||sc>prev.score) byId.set(Number(it.id),{id:Number(it.id),score:sc,alias:normalizeArabicText(it.name)});
+  });
+  return [...byId.values()].sort((a,b)=>b.score-a.score).slice(0,limit);
+}
+function qtyFromVoiceText(text){
+  const t=detectDualForms(stripFillerWords(text));
+  for(const tok of t.split(/\s+/)){
+    if(/^\d+$/.test(tok)) return Math.max(1,parseInt(tok,10));
+    if(numberWords[tok]) return numberWords[tok];
+  }
+  return 1;
+}
+function showNearestVoiceChoices(text, titlePrefix='مش متأكد من اللفظ'){
+  const picks=nearestVoiceChoices(text,4);
+  if(!picks.length) return false;
+  const qty=qtyFromVoiceText(text);
+  const heard=String(text||'').trim();
+  showVoiceChoices(`${titlePrefix} «${heard}» — تقصد أنهي واحد؟`,picks.map(x=>x.id),qty);
+  return true;
+}
+function findUnmatchedVoiceSegment(raw,hits){
+  let text=detectDualForms(stripFillerWords(raw));
+  const segments=splitOrderSegments(text);
+  for(const seg of segments){
+    const n=normalizeArabicText(seg);
+    const represented=hits.some(h=>{
+      const alias=normalizeArabicText(h.alias||'');
+      const heard=normalizeArabicText(h.heard||'');
+      return (alias&&n.includes(alias)) || (heard&&n.includes(heard));
+    });
+    if(!represented){
+      const words=n.split(/\s+/).filter(tok=>!/^\d+$/.test(tok)&&!numberWords[tok]);
+      if(words.length) return seg;
+    }
+  }
+  return null;
+}
 function executeVoiceCommand(){
     const input=document.getElementById('voiceCommand'); const raw=input.value.trim();
+    clearVoiceChoices();
     if(!raw) return alert('اكتب أو قول الطلب الأول');
+    const generic=detectGenericVoiceIntent(raw);
+    if(generic){ showVoiceChoices(generic.title,generic.ids,generic.qty); return; }
     const hits=parseOrderCommand(raw);
-    if(!hits.length) return alert('مش قادر أفهم الطلب. قول الاسم بشكل قريب من القائمة، مثال: اتنين شاي وبيبسي وحمص.');
+    if(!hits.length){
+      // Never dead-end: always offer the nearest items as quick choices.
+      if(showNearestVoiceChoices(raw,'سمعت')) return;
+      return alert('ماقدرتش أحدد الصنف. جرّب تاني أو استخدم البحث السريع.');
+    }
 
-    // Don't silently execute very weak fuzzy matches.
-    const weak=hits.filter(h=>h.fuzzy && h.score<0.78);
-    if(weak.length){
-      const names=weak.map(h=>items.find(i=>Number(i.id)===Number(h.id))?.name).filter(Boolean);
-      if(!confirm('أنا مش متأكد 100% من: '+names.join('، ')+'\nأضيفهم؟')) return;
+    // A weak fuzzy guess must never execute silently; show nearest choices instead.
+    const weak=hits.find(h=>h.fuzzy && h.score<0.84);
+    if(weak){
+      const fragment=weak.heard||raw;
+      showNearestVoiceChoices(fragment,'أنا مش متأكد من');
+      return;
     }
 
     const done=[];
@@ -1381,6 +1495,16 @@ function executeVoiceCommand(){
       const item=items.find(i=>Number(i.id)===Number(h.id)); if(!item)return;
       changeQty(item.id,h.count||1); done.push(`${h.count||1} × ${item.name}`);
     });
+
+    // If part of a multi-item sentence was not understood, execute the clear part
+    // and immediately offer nearest choices for the unresolved part.
+    const unmatched=findUnmatchedVoiceSegment(raw,hits);
+    if(unmatched){
+      showNearestVoiceChoices(unmatched,'نفذت اللي فهمته، ومش متأكد من');
+      input.value=unmatched;
+      return;
+    }
+
     input.value='';
     alert('فهمت الطلب وأضافت: '+done.join('، '));
 }
