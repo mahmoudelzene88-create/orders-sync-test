@@ -505,7 +505,7 @@
             <button class="voice-btn" type="button" onclick="startVoiceCommand()">🎤</button>
             <button class="voice-btn voice-run" type="button" onclick="executeVoiceCommand()">تنفيذ</button>
         </div>
-        <div class="voice-help">لو الميكروفون مش مدعوم على الجهاز، اكتب نفس الجملة واضغط تنفيذ.</div>
+        <div class="voice-help">قولها بطريقتك: «شايين وبيبسي»، «هاتلي 3 حمص وفرنساوي» أو «حجر / معسل / قص / سلوم». ولو الميكروفون مش مدعوم، اكتبها واضغط تنفيذ.</div>
     </div>
 </div>
 
@@ -1207,51 +1207,201 @@ function normalizeArabicText(t){
     return String(t||'').toLowerCase().replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[ًٌٍَُِّْـ]/g,'').replace(/[،,؛;.!؟?]/g,' ').replace(/\s+/g,' ').trim();
 }
 const numberWords={
-  'واحد':1,'واحده':1,'واحدة':1,'اتنين':2,'اثنين':2,'اثنان':2,'تنين':2,'تلاته':3,'ثلاثه':3,'ثلاثة':3,'اربع':4,'اربعه':4,'أربعة':4,
-  'خمس':5,'خمسه':5,'سته':6,'ست':6,'سبعه':7,'سبع':7,'تمانيه':8,'ثمانيه':8,'تسعه':9,'تسع':9,'عشره':10,'عشر':10
+  'واحد':1,'واحده':1,'واحدة':1,'اول':1,
+  'اتنين':2,'اثنين':2,'اثنان':2,'تنين':2,'2':2,
+  'تلاته':3,'ثلاثه':3,'ثلاثة':3,'تلات':3,'ثلاث':3,'3':3,
+  'اربع':4,'اربعه':4,'أربعة':4,'4':4,
+  'خمس':5,'خمسه':5,'خمسة':5,'5':5,
+  'سته':6,'ستة':6,'ست':6,'6':6,
+  'سبعه':7,'سبعة':7,'سبع':7,'7':7,
+  'تمانيه':8,'تمانية':8,'ثمانيه':8,'ثمانية':8,'8':8,
+  'تسعه':9,'تسعة':9,'تسع':9,'9':9,
+  'عشره':10,'عشرة':10,'عشر':10,'10':10
 };
+
+// أسماء بديلة باللهجة المصرية + اختلافات شائعة في التعرف الصوتي
 const voiceAliases={
-  1:['حجر سلوم','سلوم'],2:['حجر شيشه فواكه','شيشه فواكه'],4:['شاي كشري','شاي'],5:['شاي عربي'],6:['شاي قرنفل'],7:['شاي اخضر'],
-  8:['قهوه تركي ساده','تركي ساده'],9:['قهوه تركي مانو','تركي مانو'],10:['قهوه فرنساوي','فرنساوي'],11:['اسبريسو','اسبرسو'],12:['حمص شام','حمص'],
-  13:['قرفه بالجنزبيل','قرفه جنزبيل'],14:['قرفه جنزبيل بالحليب'],15:['كمون بليمون','كمون'],16:['حلبه'],17:['مياه صغيره','مياه','ميه'],
-  18:['زبادي عسل'],19:['كوكتيل زبادي فواكه'],20:['كوكتيل باشون ميكس','باشون ميكس'],21:['بيبسي','بيبسى'],22:['ريد بول'],23:['افوكاتو'],24:['ميلك شيك فانيليا','ميلك شيك'],25:['تشيز كيك']
+  1:['حجر سلوم','سلوم','حجر','معسل','قص','حجر عادي','معسل عادي','قص سلوم','معسل سلوم'],
+  2:['حجر شيشه فواكه','شيشه فواكه','شيشة فواكه','حجر فواكه','فواكه شيشه','معسل فواكه','معسل فاكهه','معسل فاكهة','قص فواكه'],
+  3:['بلاي ستيشن','بلايستيشن','بلاي استيشن','بلاي ستيشن 4','بلايستيشن 4','بلاي'],
+  4:['شاي كشري','شاي كشرى','شاي عادي','شاي ساده','شاي سادة','شاي'],
+  5:['شاي عربي','شاي عربى','عربي','عربى'],
+  6:['شاي قرنفل','شاي بالقرنفل','قرنفل'],
+  7:['شاي اخضر','شاي أخضر','اخضر','أخضر'],
+  8:['قهوه تركي ساده','قهوة تركي سادة','قهوه ساده','قهوة سادة','تركي ساده','تركي سادة','ساده تركي'],
+  9:['قهوه تركي مانو','قهوة تركي مانو','تركي مانو','مانو'],
+  10:['قهوه فرنساوي','قهوة فرنساوي','قهوه فرنساوى','قهوة فرنساوى','فرنساوي','فرنساوى','فرنسي'],
+  11:['اسبريسو','اسبرسو','ايسبريسو','اسبريسو سنجل','اسبرسو سنجل','سنجل اسبريسو'],
+  12:['حمص شام','حمص الشام','حمص','حمص الشام'],
+  13:['قرفه بالجنزبيل','قرفة بالجنزبيل','قرفه جنزبيل','قرفة جنزبيل','قرفه زنجبيل','قرفة زنجبيل'],
+  14:['قرفه جنزبيل بالحليب','قرفة جنزبيل بالحليب','قرفه بالحليب','قرفة بالحليب','قرفه لبن','قرفة لبن','جنزبيل بالحليب'],
+  15:['كمون بليمون','كمون بليمون','كمون بلمون','كمون ليمون','كمون'],
+  16:['حلبه','حلبة'],
+  17:['مياه صغيره','مياه صغيرة','مياه','ميه','مية','مايه','مياه صغيره'],
+  18:['زبادي عسل','زبادى عسل','زبادي بالعسل','زبادى بالعسل'],
+  19:['كوكتيل زبادي فواكه','كوكتيل زبادى فواكه','زبادي فواكه','زبادى فواكه','كوكتيل فواكه'],
+  20:['كوكتيل باشون ميكس','باشون ميكس','باشن ميكس','باشون','باشن'],
+  21:['بيبسي','بيبسى','بيبس','كولا'],
+  22:['ريد بول','ريدبول','ريد بُل','ريدبل'],
+  23:['افوكاتو','افوكادو','أفوكاتو','أفوكادو'],
+  24:['ميلك شيك فانيليا','ميلك شيك','ميلك شيك فانيلا','ملك شيك','ميلكشيك'],
+  25:['تشيز كيك','تشيزكيك','شيز كيك','شييز كيك','cheesecake']
 };
-function countBefore(text,index){
-    const pre=text.slice(Math.max(0,index-24),index).trim();
-    const tokens=pre.split(/\s+/).slice(-4);
-    for(let i=tokens.length-1;i>=0;i--){
-      const tok=tokens[i]; if(/^\d+$/.test(tok)) return Math.max(1,parseInt(tok,10)); if(numberWords[tok]) return numberWords[tok];
+
+function editDistance(a,b){
+  a=String(a); b=String(b);
+  const dp=Array.from({length:a.length+1},()=>Array(b.length+1).fill(0));
+  for(let i=0;i<=a.length;i++) dp[i][0]=i;
+  for(let j=0;j<=b.length;j++) dp[0][j]=j;
+  for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++) {
+    const cost=a[i-1]===b[j-1]?0:1;
+    dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+cost);
+  }
+  return dp[a.length][b.length];
+}
+function similarity(a,b){
+  a=normalizeArabicText(a); b=normalizeArabicText(b);
+  if(!a||!b) return 0;
+  if(a===b) return 1;
+  if(a.includes(b)||b.includes(a)) return Math.min(a.length,b.length)/Math.max(a.length,b.length)+0.15;
+  return 1-(editDistance(a,b)/Math.max(a.length,b.length));
+}
+function stripFillerWords(text){
+  const fillers=['هات','هاتلي','هاتلى','عايز','عاوزه','عاوز','زود','زودلي','زودلى','ضيف','اضف','أضف','اديني','ادينى','لو سمحت','من فضلك','كمان','واعمل','اعمل','محتاج'];
+  let t=' '+normalizeArabicText(text)+' ';
+  fillers.sort((a,b)=>b.length-a.length).forEach(f=>{ t=t.replace(new RegExp(' '+normalizeArabicText(f)+' ','g'),' '); });
+  return t.replace(/\s+/g,' ').trim();
+}
+function detectDualForms(text){
+  let t=' '+text+' ';
+  const forms={
+    'شايين':'اتنين شاي','بيبسيين':'اتنين بيبسي','بيبسين':'اتنين بيبسي','قهوهين':'اتنين قهوه',
+    'حمصين':'اتنين حمص','مياهين':'اتنين مياه','ميتين':'اتنين ميه','ريدبولين':'اتنين ريد بول',
+    'فرنساويين':'اتنين فرنساوي','اسبريسوين':'اتنين اسبريسو','تشيزكيكين':'اتنين تشيز كيك',
+    'حجرين':'اتنين حجر','سلومين':'اتنين سلوم','معسلين':'اتنين معسل','قصين':'اتنين قص'
+  };
+  Object.entries(forms).forEach(([k,v])=>{ t=t.replace(new RegExp(' '+normalizeArabicText(k)+' ','g'),' '+normalizeArabicText(v)+' '); });
+  return t.replace(/\s+/g,' ').trim();
+}
+function getQtyNear(text,start,end){
+  const before=text.slice(Math.max(0,start-28),start).trim().split(/\s+/).slice(-5);
+  for(let i=before.length-1;i>=0;i--){
+    const tok=before[i]; if(/^\d+$/.test(tok)) return Math.max(1,parseInt(tok,10)); if(numberWords[tok]) return numberWords[tok];
+  }
+  const after=text.slice(end,Math.min(text.length,end+18)).trim().split(/\s+/).slice(0,3);
+  for(const tok of after){ if(/^\d+$/.test(tok)) return Math.max(1,parseInt(tok,10)); if(numberWords[tok]) return numberWords[tok]; }
+  return 1;
+}
+function makeAliasCandidates(){
+  const out=[];
+  Object.entries(voiceAliases).forEach(([id,aliases])=>aliases.forEach(alias=>out.push({id:Number(id),alias:normalizeArabicText(alias)})));
+  return out.sort((a,b)=>b.alias.length-a.alias.length);
+}
+function findExactMatches(text){
+  const candidates=makeAliasCandidates(); const matches=[]; const occupied=[];
+  for(const c of candidates){
+    let pos=0;
+    while(pos<text.length){
+      const idx=text.indexOf(c.alias,pos); if(idx<0) break;
+      const end=idx+c.alias.length;
+      const overlap=occupied.some(r=>!(end<=r.start||idx>=r.end));
+      if(!overlap){
+        matches.push({id:c.id,start:idx,end,alias:c.alias,score:1,count:getQtyNear(text,idx,end)});
+        occupied.push({start:idx,end});
+      }
+      pos=end;
     }
-    return 1;
+  }
+  return matches.sort((a,b)=>a.start-b.start);
+}
+function fuzzyFindSegment(segment){
+  const s=normalizeArabicText(segment).trim(); if(!s) return null;
+  const candidates=makeAliasCandidates();
+  let best=null;
+  for(const c of candidates){
+    // compare whole segment and short sliding word windows to alias
+    const words=s.split(/\s+/); const aw=c.alias.split(/\s+/).length;
+    const windows=[s];
+    for(let len=Math.max(1,aw-1);len<=Math.min(words.length,aw+1);len++) for(let i=0;i+len<=words.length;i++) windows.push(words.slice(i,i+len).join(' '));
+    for(const w of windows){
+      const sc=similarity(w,c.alias);
+      if(!best||sc>best.score) best={id:c.id,score:sc,alias:c.alias,heard:w};
+    }
+  }
+  return best&&best.score>=0.72?best:null;
+}
+function splitOrderSegments(text){
+  // SpeechRecognition often removes punctuation; Egyptian orders usually use "و" / "وكمان"
+  return text
+    .replace(/\s+وكمان\s+/g,' | ')
+    .replace(/\s+وبعدين\s+/g,' | ')
+    .replace(/\s+و(?=[^\s])/g,' و')
+    .replace(/\s+و\s+/g,' | ')
+    .split('|').map(x=>x.trim()).filter(Boolean);
 }
 function parseOrderCommand(raw){
-    const text=normalizeArabicText(raw); const hits=[]; const used=new Set();
-    const candidates=[];
-    Object.entries(voiceAliases).forEach(([id,aliases])=>aliases.forEach(a=>candidates.push({id,alias:normalizeArabicText(a)})));
-    candidates.sort((a,b)=>b.alias.length-a.alias.length);
-    for(const c of candidates){
-      if(used.has(c.id)) continue; const idx=text.indexOf(c.alias); if(idx<0) continue;
-      // generic "شاي" only if no more specific tea alias matched around it
-      if(c.alias==='شاي' && candidates.some(x=>x.id!==c.id && x.alias.startsWith('شاي ') && text.includes(x.alias))) continue;
-      hits.push({id:Number(c.id),count:countBefore(text,idx)}); used.add(c.id);
-    }
-    return hits;
+  let text=stripFillerWords(raw);
+  text=detectDualForms(text);
+  const exact=findExactMatches(text);
+  const byId=new Map();
+  exact.forEach(m=>{
+    // If generic tea matched inside a specific tea phrase, prefer the specific alias.
+    const prev=byId.get(m.id); if(!prev||m.alias.length>prev.alias.length) byId.set(m.id,m);
+  });
+  const result=[...byId.values()];
+
+  // For any segment not represented by an exact hit, try tolerant/fuzzy matching.
+  const segments=splitOrderSegments(text);
+  for(const seg of segments){
+    if(result.some(r=>seg.includes(r.alias))) continue;
+    const fuzzy=fuzzyFindSegment(seg); if(!fuzzy) continue;
+    // Avoid duplicate item already captured exactly.
+    if(result.some(r=>r.id===fuzzy.id)) continue;
+    // quantity from this segment, default 1
+    const normSeg=normalizeArabicText(seg); const q=getQtyNear(normSeg,0,normSeg.length);
+    result.push({id:fuzzy.id,count:q,score:fuzzy.score,alias:fuzzy.alias,heard:fuzzy.heard,fuzzy:true});
+  }
+  return result.sort((a,b)=>(a.start??9999)-(b.start??9999));
 }
 function executeVoiceCommand(){
     const input=document.getElementById('voiceCommand'); const raw=input.value.trim();
     if(!raw) return alert('اكتب أو قول الطلب الأول');
-    const hits=parseOrderCommand(raw); if(!hits.length) return alert('مش قادر أحدد صنف من الجملة. جرّب اسم الصنف زي: اتنين شاي كشري وواحد بيبسي');
+    const hits=parseOrderCommand(raw);
+    if(!hits.length) return alert('مش قادر أفهم الطلب. قول الاسم بشكل قريب من القائمة، مثال: اتنين شاي وبيبسي وحمص.');
+
+    // Don't silently execute very weak fuzzy matches.
+    const weak=hits.filter(h=>h.fuzzy && h.score<0.78);
+    if(weak.length){
+      const names=weak.map(h=>items.find(i=>Number(i.id)===Number(h.id))?.name).filter(Boolean);
+      if(!confirm('أنا مش متأكد 100% من: '+names.join('، ')+'\nأضيفهم؟')) return;
+    }
+
     const done=[];
-    hits.forEach(h=>{ const item=items.find(i=>Number(i.id)===Number(h.id)); if(!item)return; changeQty(item.id,h.count); done.push(`${h.count} × ${item.name}`); });
-    input.value=''; alert('تمت الإضافة: '+done.join('، '));
+    hits.forEach(h=>{
+      const item=items.find(i=>Number(i.id)===Number(h.id)); if(!item)return;
+      changeQty(item.id,h.count||1); done.push(`${h.count||1} × ${item.name}`);
+    });
+    input.value='';
+    alert('فهمت الطلب وأضافت: '+done.join('، '));
 }
 function startVoiceCommand(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(!SR) return alert('التعرف الصوتي غير مدعوم في المتصفح ده. اكتب الأمر في الخانة واضغط تنفيذ.');
-    const rec=new SR(); rec.lang='ar-EG'; rec.interimResults=false; rec.maxAlternatives=1;
+    if(!SR) return alert('التعرف الصوتي غير مدعوم في المتصفح ده. اكتب الطلب في الخانة واضغط تنفيذ؛ الفهم الذكي نفسه شغال.');
+    const rec=new SR(); rec.lang='ar-EG'; rec.interimResults=false; rec.maxAlternatives=3;
     const btn=event?.currentTarget; if(btn){btn.textContent='🎧';btn.disabled=true;}
-    rec.onresult=e=>{ const t=e.results[0][0].transcript; document.getElementById('voiceCommand').value=t; if(btn){btn.textContent='🎤';btn.disabled=false;} executeVoiceCommand(); };
-    rec.onerror=()=>{ if(btn){btn.textContent='🎤';btn.disabled=false;} alert('ماقدرتش أسمع الأمر. جرّب تاني أو اكتبه.'); };
+    rec.onresult=e=>{
+      // Choose the recognition alternative that produces the most confident item matches.
+      let bestText=e.results[0][0].transcript, bestScore=-1;
+      for(let i=0;i<e.results[0].length;i++){
+        const t=e.results[0][i].transcript; const parsed=parseOrderCommand(t);
+        const score=parsed.reduce((s,h)=>s+(h.score||1),0)+(parsed.length*2);
+        if(score>bestScore){bestScore=score;bestText=t;}
+      }
+      document.getElementById('voiceCommand').value=bestText;
+      if(btn){btn.textContent='🎤';btn.disabled=false;}
+      executeVoiceCommand();
+    };
+    rec.onerror=()=>{ if(btn){btn.textContent='🎤';btn.disabled=false;} alert('ماقدرتش أسمع الأمر بوضوح. جرّب تاني أو اكتبه.'); };
     rec.onend=()=>{ if(btn){btn.textContent='🎤';btn.disabled=false;} };
     try{rec.start();}catch(e){if(btn){btn.textContent='🎤';btn.disabled=false;}}
 }
