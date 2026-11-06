@@ -437,6 +437,26 @@
         .activity-row .who { color:#93c5fd; font-weight:700; }
         .activity-row .when { color:var(--text-muted); font-size:.72rem; margin-top:3px; }
 
+
+        .smart-tools { margin:10px 16px 0; display:grid; gap:10px; }
+        .tool-card { border:1px solid var(--border); background:rgba(255,255,255,.035); border-radius:12px; padding:10px 12px; }
+        .tool-title { font-size:.84rem; font-weight:800; margin-bottom:8px; color:#e2e8f0; }
+        .quick-add { display:flex; gap:7px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px; }
+        .quick-add::-webkit-scrollbar{display:none}
+        .quick-btn { flex:0 0 auto; border:1px solid #10b981; background:rgba(16,185,129,.10); color:#d1fae5; border-radius:10px; padding:8px 10px; font-weight:800; font-size:.78rem; cursor:pointer; }
+        .quick-btn small { display:block; color:#94a3b8; font-weight:600; margin-top:2px; }
+        .voice-row { display:grid; grid-template-columns:1fr auto auto; gap:6px; }
+        .voice-row input { min-width:0; background:#0f172a; border:1px solid var(--border); color:#fff; padding:9px 10px; border-radius:9px; font-size:.82rem; }
+        .voice-btn { border:none; border-radius:9px; padding:8px 11px; font-weight:800; cursor:pointer; color:#fff; background:#8b5cf6; }
+        .voice-run { background:#10b981; color:#05140e; }
+        .voice-help { margin-top:6px; color:#94a3b8; font-size:.7rem; line-height:1.5; }
+        .pending-badge { display:inline-block; margin-inline-start:6px; padding:2px 7px; border-radius:999px; background:#7c2d12; color:#fed7aa; font-weight:800; }
+        .search-wrap { margin:10px 16px 0; display:flex; gap:6px; align-items:center; }
+        .search-input { flex:1; min-width:0; background:#0f172a; border:1px solid var(--border); color:#fff; padding:11px 12px; border-radius:10px; font-size:.88rem; outline:none; }
+        .search-input:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(16,185,129,.12); }
+        .search-clear { border:none; background:#334155; color:#fff; padding:10px 12px; border-radius:9px; font-weight:800; cursor:pointer; }
+        .search-meta { margin:5px 18px 0; color:var(--text-muted); font-size:.7rem; min-height:1em; }
+
 </style>
 </head>
 <body>
@@ -473,8 +493,20 @@
     </div>
 </div>
 
-<div class="mobile-note">
-    📱 على الموبايل: افتح الملف في <b>Chrome</b> على أندرويد أو <b>Safari</b> على iPhone، وليس داخل معاينة واتساب؛ معاينة واتساب قد تمنع أزرار JavaScript من العمل.
+<div class="smart-tools">
+    <div class="tool-card">
+        <div class="tool-title">⚡ ضيف سريع — الأكثر طلبًا</div>
+        <div id="quickAdd" class="quick-add"></div>
+    </div>
+    <div class="tool-card">
+        <div class="tool-title">🎙️ أمر سريع بالصوت أو الكتابة</div>
+        <div class="voice-row">
+            <input id="voiceCommand" type="text" placeholder="مثال: اتنين شاي كشري وواحد بيبسي">
+            <button class="voice-btn" type="button" onclick="startVoiceCommand()">🎤</button>
+            <button class="voice-btn voice-run" type="button" onclick="executeVoiceCommand()">تنفيذ</button>
+        </div>
+        <div class="voice-help">لو الميكروفون مش مدعوم على الجهاز، اكتب نفس الجملة واضغط تنفيذ.</div>
+    </div>
 </div>
 
 <div class="timer-card">
@@ -501,6 +533,12 @@
     <button class="tab" onclick="filterCategory('cold', this)">بارد وعصائر</button>
     <button class="tab" onclick="filterCategory('active', this)">المطلوب حالياً (<span id="activeCount">0</span>)</button>
 </div>
+
+<div class="search-wrap">
+    <input id="itemSearch" class="search-input" type="search" placeholder="🔎 ابحث عن صنف... مثال: شاي، بيبسي، قهوة" oninput="handleItemSearch(this.value)">
+    <button class="search-clear" type="button" onclick="clearItemSearch()">مسح</button>
+</div>
+<div id="searchMeta" class="search-meta"></div>
 
 <div class="items-container" id="itemsList"></div>
 
@@ -583,6 +621,10 @@ const SHARED_ROOM = "orders-main";
 let sharedDb = null;
 let sharedReady = false;
 let applyingRemoteUpdate = false;
+let cloudConnected = false;
+let flushingOffline = false;
+const OFFLINE_QUEUE_KEY = 'orders_offline_queue_v1';
+const OFFLINE_TIMER_KEY = 'orders_offline_timer_v1';
 let currentUserName = localStorage.getItem('orders_user_name_v1') || '';
 let activityEntries = [];
 let invoiceHistory = [];
@@ -656,16 +698,12 @@ function logActivity(action, details='') {
     deviceId, action, details,
     timestamp: Date.now()
   };
-  if (sharedReady && sharedDb) {
-    sharedDb.ref('rooms/' + SHARED_ROOM + '/activity').push({
-      ...entry,
-      timestamp: firebase.database.ServerValue.TIMESTAMP
-    });
+  if (isCloudOnline()) {
+    sharedDb.ref('rooms/' + SHARED_ROOM + '/activity').push({ ...entry, timestamp:firebase.database.ServerValue.TIMESTAMP });
   } else {
-    activityEntries.unshift(entry);
-    activityEntries = activityEntries.slice(0,50);
-    localStorage.setItem('orders_activity_local_v1', JSON.stringify(activityEntries));
-    renderActivity();
+    activityEntries.unshift(entry); activityEntries=activityEntries.slice(0,50);
+    localStorage.setItem('orders_activity_local_v1',JSON.stringify(activityEntries)); renderActivity();
+    queueOfflineOp({type:'activity',entry});
   }
 }
 
@@ -753,6 +791,7 @@ function clearCurrentSessionNoPassword(logIt=true) {
 }
 
 async function closeAndArchiveInvoice() {
+  if (!isCloudOnline()) { alert('قفل الفاتورة يحتاج اتصال بالإنترنت لضمان حفظها في الهيستوري بدون تعارض. الطلبات الحالية محفوظة محليًا.'); return; }
   const anyOrders = items.some(i => Number(i.qty)>0);
   const liveTimerMs = getLiveTimerMs();
   if (!anyOrders && liveTimerMs<=0) { alert('مفيش طلبات أو وقت بلايستيشن لقفل الفاتورة'); return; }
@@ -800,13 +839,70 @@ function firebaseConfigured() {
   return !!(firebaseConfig.apiKey && firebaseConfig.databaseURL && firebaseConfig.projectId && firebaseConfig.appId);
 }
 
-function setSyncStatus(text, online=false) {
-  const el = document.getElementById('syncStatus');
-  if (!el) return;
-  el.textContent = text;
-  el.classList.toggle('online', online);
-  el.classList.toggle('offline', !online);
+function getOfflineQueue() {
+  try { return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]'); } catch(_) { return []; }
 }
+function saveOfflineQueue(q) {
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q));
+  refreshConnectionStatus();
+}
+function queueOfflineOp(op) {
+  const q=getOfflineQueue();
+  q.push({ ...op, opId: deviceId+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,7), queuedAt:Date.now() });
+  saveOfflineQueue(q);
+}
+function isCloudOnline(){ return !!(sharedReady && sharedDb && cloudConnected && navigator.onLine); }
+function setSyncStatus(text, online=false) {
+  const el=document.getElementById('syncStatus'); if(!el) return;
+  el.innerHTML=text;
+  el.classList.toggle('online', online); el.classList.toggle('offline', !online);
+}
+function refreshConnectionStatus() {
+  const n=getOfflineQueue().length;
+  if (flushingOffline) { setSyncStatus(`🟡 جاري المزامنة... <span class="pending-badge">${n} معلّق</span>`); return; }
+  if (isCloudOnline()) setSyncStatus(`🟢 متصل ومزامن${n?` <span class="pending-badge">${n} معلّق</span>`:''}`, true);
+  else setSyncStatus(`🔴 أوفلاين — التعديلات محفوظة على الجهاز${n?` <span class="pending-badge">${n} معلّق</span>`:''}`);
+}
+async function applyQueuedOp(op) {
+  const room=sharedDb.ref('rooms/'+SHARED_ROOM);
+  if(op.type==='qty'){
+    await room.child('items').transaction(arr=>{
+      arr=Array.isArray(arr)?arr:JSON.parse(JSON.stringify(defaultItems));
+      const it=arr.find(x=>String(x.id)===String(op.itemId));
+      if(it) it.qty=Math.max(0,Math.round((Number(it.qty||0)+Number(op.delta||0))*10)/10);
+      return arr;
+    });
+  } else if(op.type==='price'){
+    await room.child('items').transaction(arr=>{
+      arr=Array.isArray(arr)?arr:JSON.parse(JSON.stringify(defaultItems));
+      const it=arr.find(x=>String(x.id)===String(op.itemId)); if(it) it.ourPrice=Number(op.value); return arr;
+    });
+  } else if(op.type==='addItem'){
+    await room.child('items').transaction(arr=>{
+      arr=Array.isArray(arr)?arr:JSON.parse(JSON.stringify(defaultItems));
+      if(!arr.some(x=>String(x.id)===String(op.item.id))) arr.push(op.item); return arr;
+    });
+  } else if(op.type==='activity'){
+    await room.child('activity').push({ ...op.entry, timestamp:firebase.database.ServerValue.TIMESTAMP });
+  }
+}
+async function flushOfflineQueue(){
+  if(!isCloudOnline() || flushingOffline) return;
+  flushingOffline=true; refreshConnectionStatus();
+  let q=getOfflineQueue();
+  while(q.length && isCloudOnline()){
+    const op=q[0];
+    try { await applyQueuedOp(op); q.shift(); localStorage.setItem(OFFLINE_QUEUE_KEY,JSON.stringify(q)); }
+    catch(e){ console.error('offline flush',e); break; }
+  }
+  const pendingTimer=localStorage.getItem(OFFLINE_TIMER_KEY);
+  if(isCloudOnline() && pendingTimer){
+    try { const t=JSON.parse(pendingTimer); await sharedDb.ref('rooms/'+SHARED_ROOM+'/timer').set({...t,updatedAt:firebase.database.ServerValue.TIMESTAMP}); localStorage.removeItem(OFFLINE_TIMER_KEY); } catch(e){console.error(e);}
+  }
+  flushingOffline=false; refreshConnectionStatus();
+}
+window.addEventListener('online',()=>{ refreshConnectionStatus(); setTimeout(flushOfflineQueue,300); });
+window.addEventListener('offline',()=>{ cloudConnected=false; refreshConnectionStatus(); });
 
 function initSharedSync() {
   if (!firebaseConfigured()) {
@@ -818,7 +914,12 @@ function initSharedSync() {
     sharedDb = firebase.database();
     const roomRef = sharedDb.ref('rooms/' + SHARED_ROOM);
     sharedReady = true;
-    setSyncStatus('🟢 مزامنة مباشرة مفعلة — أي تعديل سيظهر على كل الأجهزة', true);
+    sharedDb.ref('.info/connected').on('value', snap => {
+      cloudConnected = snap.val() === true;
+      refreshConnectionStatus();
+      if (cloudConnected) setTimeout(flushOfflineQueue, 250);
+    });
+    refreshConnectionStatus();
 
     roomRef.child('activity').limitToLast(50).on('value', snap => {
       const val = snap.val() || {};
@@ -830,11 +931,13 @@ function initSharedSync() {
       const val=snap.val() || {};
       invoiceHistory=Object.entries(val).map(([key,inv])=>({key,...inv}));
       renderInvoiceHistory();
+      renderQuickAdd();
     });
 
     roomRef.child('items').on('value', snap => {
       const remoteItems = snap.val();
       if (Array.isArray(remoteItems) && remoteItems.length) {
+        if (flushingOffline || getOfflineQueue().length) return;
         applyingRemoteUpdate = true;
         items = remoteItems;
         localStorage.setItem('orders_items_v3', JSON.stringify(items));
@@ -875,19 +978,18 @@ function initSharedSync() {
 }
 
 function pushItemsState() {
-  if (sharedReady && !applyingRemoteUpdate) {
-    sharedDb.ref('rooms/' + SHARED_ROOM + '/items').set(items);
+  if (isCloudOnline() && !applyingRemoteUpdate && !getOfflineQueue().length) {
+    sharedDb.ref('rooms/' + SHARED_ROOM + '/items').set(items).catch(()=>refreshConnectionStatus());
   }
 }
 
 function pushTimerState() {
-  if (sharedReady && !applyingRemoteUpdate) {
-    sharedDb.ref('rooms/' + SHARED_ROOM + '/timer').set({
-      running: timerRunning,
-      start: timerStart || 0,
-      elapsed: timerElapsed || 0,
-      updatedAt: firebase.database.ServerValue.TIMESTAMP
-    });
+  if (applyingRemoteUpdate) return;
+  const state={ running:timerRunning, start:timerStart||0, elapsed:timerElapsed||0 };
+  if (isCloudOnline()) {
+    sharedDb.ref('rooms/'+SHARED_ROOM+'/timer').set({...state,updatedAt:firebase.database.ServerValue.TIMESTAMP}).catch(()=>{ localStorage.setItem(OFFLINE_TIMER_KEY,JSON.stringify(state)); refreshConnectionStatus(); });
+  } else {
+    localStorage.setItem(OFFLINE_TIMER_KEY,JSON.stringify(state)); refreshConnectionStatus();
   }
 }
 </script>
@@ -927,6 +1029,7 @@ const defaultItems = [
 
 let items = JSON.parse(localStorage.getItem('orders_items_v3')) || defaultItems;
 let currentFilter = 'all';
+let searchQuery = '';
 
 // Timer state
 let timerRunning = false;
@@ -957,12 +1060,32 @@ function renderItems() {
     document.getElementById('totalCafe').innerText = totalCafe + ' ج';
     document.getElementById('totalDiff').innerText = (totalCafe - totalOur) + ' ج';
     document.getElementById('activeCount').innerText = activeItemsCount;
+    renderQuickAdd();
 
+    const normalizeArabic = (text) => String(text || '')
+        .toLowerCase()
+        .replace(/[أإآ]/g, 'ا')
+        .replace(/ة/g, 'ه')
+        .replace(/ى/g, 'ي')
+        .replace(/[ًٌٍَُِّْـ]/g, '')
+        .trim();
+
+    const q = normalizeArabic(searchQuery);
     const filtered = items.filter(item => {
-        if (currentFilter === 'all') return true;
-        if (currentFilter === 'active') return item.qty > 0;
-        return item.cat === currentFilter;
+        const categoryMatch = currentFilter === 'all'
+            ? true
+            : currentFilter === 'active'
+                ? item.qty > 0
+                : item.cat === currentFilter;
+        if (!categoryMatch) return false;
+        if (!q) return true;
+        return normalizeArabic(item.name).includes(q);
     });
+
+    const meta = document.getElementById('searchMeta');
+    if (meta) {
+        meta.innerText = q ? `نتائج البحث: ${filtered.length} صنف` : '';
+    }
 
     filtered.forEach(item => {
         const card = document.createElement('div');
@@ -998,6 +1121,7 @@ function changeQty(id, delta) {
     item.qty = Math.max(0, Math.round((item.qty + delta) * 10) / 10);
     if (item.qty === before) return;
     saveState();
+    if (!isCloudOnline()) queueOfflineOp({type:'qty',itemId:id,delta});
     renderItems();
     logActivity(delta > 0 ? 'زيادة طلب' : 'نقص طلب', `${item.name}: ${before} ← ${item.qty}`);
 }
@@ -1010,9 +1134,25 @@ function editItemPrice(id) {
         const oldPrice = item.ourPrice;
         item.ourPrice = parseFloat(newOur);
         saveState();
+        if (!isCloudOnline()) queueOfflineOp({type:'price',itemId:id,value:item.ourPrice});
         renderItems();
         logActivity('تعديل سعر', `${item.name}: ${oldPrice} ج ← ${item.ourPrice} ج`);
     }
+}
+
+function handleItemSearch(value) {
+    searchQuery = value || '';
+    renderItems();
+}
+
+function clearItemSearch() {
+    searchQuery = '';
+    const input = document.getElementById('itemSearch');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    renderItems();
 }
 
 function filterCategory(cat, btn) {
@@ -1045,11 +1185,79 @@ function addCustomItem() {
     document.getElementById('newOurPrice').value = '';
     document.getElementById('newCafePrice').value = '';
     saveState();
+    if (!isCloudOnline()) queueOfflineOp({type:'addItem',item:items[items.length-1]});
     renderItems();
     logActivity('إضافة صنف جديد', `${name} — ${ourPrice} ج`);
 }
 
+function getPopularItemIds() {
+    const scores={};
+    invoiceHistory.forEach(inv => (inv.items||[]).forEach(i => { scores[i.id]=(scores[i.id]||0)+Number(i.qty||0); }));
+    const ranked=Object.entries(scores).sort((a,b)=>b[1]-a[1]).map(([id])=>String(id));
+    const fallback=['4','21','8','17','12','2'];
+    return [...ranked,...fallback].filter((id,idx,a)=>a.indexOf(id)===idx).slice(0,6);
+}
+function renderQuickAdd(){
+    const el=document.getElementById('quickAdd'); if(!el) return;
+    const ids=getPopularItemIds();
+    const selected=ids.map(id=>items.find(i=>String(i.id)===id)).filter(Boolean);
+    el.innerHTML=selected.map(i=>`<button class="quick-btn" type="button" onclick="changeQty(${JSON.stringify(i.id)},1)">+ ${escapeHtml(i.name)}<small>${i.ourPrice} ج</small></button>`).join('');
+}
+function normalizeArabicText(t){
+    return String(t||'').toLowerCase().replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[ًٌٍَُِّْـ]/g,'').replace(/[،,؛;.!؟?]/g,' ').replace(/\s+/g,' ').trim();
+}
+const numberWords={
+  'واحد':1,'واحده':1,'واحدة':1,'اتنين':2,'اثنين':2,'اثنان':2,'تنين':2,'تلاته':3,'ثلاثه':3,'ثلاثة':3,'اربع':4,'اربعه':4,'أربعة':4,
+  'خمس':5,'خمسه':5,'سته':6,'ست':6,'سبعه':7,'سبع':7,'تمانيه':8,'ثمانيه':8,'تسعه':9,'تسع':9,'عشره':10,'عشر':10
+};
+const voiceAliases={
+  1:['حجر سلوم','سلوم'],2:['حجر شيشه فواكه','شيشه فواكه'],4:['شاي كشري','شاي'],5:['شاي عربي'],6:['شاي قرنفل'],7:['شاي اخضر'],
+  8:['قهوه تركي ساده','تركي ساده'],9:['قهوه تركي مانو','تركي مانو'],10:['قهوه فرنساوي','فرنساوي'],11:['اسبريسو','اسبرسو'],12:['حمص شام','حمص'],
+  13:['قرفه بالجنزبيل','قرفه جنزبيل'],14:['قرفه جنزبيل بالحليب'],15:['كمون بليمون','كمون'],16:['حلبه'],17:['مياه صغيره','مياه','ميه'],
+  18:['زبادي عسل'],19:['كوكتيل زبادي فواكه'],20:['كوكتيل باشون ميكس','باشون ميكس'],21:['بيبسي','بيبسى'],22:['ريد بول'],23:['افوكاتو'],24:['ميلك شيك فانيليا','ميلك شيك'],25:['تشيز كيك']
+};
+function countBefore(text,index){
+    const pre=text.slice(Math.max(0,index-24),index).trim();
+    const tokens=pre.split(/\s+/).slice(-4);
+    for(let i=tokens.length-1;i>=0;i--){
+      const tok=tokens[i]; if(/^\d+$/.test(tok)) return Math.max(1,parseInt(tok,10)); if(numberWords[tok]) return numberWords[tok];
+    }
+    return 1;
+}
+function parseOrderCommand(raw){
+    const text=normalizeArabicText(raw); const hits=[]; const used=new Set();
+    const candidates=[];
+    Object.entries(voiceAliases).forEach(([id,aliases])=>aliases.forEach(a=>candidates.push({id,alias:normalizeArabicText(a)})));
+    candidates.sort((a,b)=>b.alias.length-a.alias.length);
+    for(const c of candidates){
+      if(used.has(c.id)) continue; const idx=text.indexOf(c.alias); if(idx<0) continue;
+      // generic "شاي" only if no more specific tea alias matched around it
+      if(c.alias==='شاي' && candidates.some(x=>x.id!==c.id && x.alias.startsWith('شاي ') && text.includes(x.alias))) continue;
+      hits.push({id:Number(c.id),count:countBefore(text,idx)}); used.add(c.id);
+    }
+    return hits;
+}
+function executeVoiceCommand(){
+    const input=document.getElementById('voiceCommand'); const raw=input.value.trim();
+    if(!raw) return alert('اكتب أو قول الطلب الأول');
+    const hits=parseOrderCommand(raw); if(!hits.length) return alert('مش قادر أحدد صنف من الجملة. جرّب اسم الصنف زي: اتنين شاي كشري وواحد بيبسي');
+    const done=[];
+    hits.forEach(h=>{ const item=items.find(i=>Number(i.id)===Number(h.id)); if(!item)return; changeQty(item.id,h.count); done.push(`${h.count} × ${item.name}`); });
+    input.value=''; alert('تمت الإضافة: '+done.join('، '));
+}
+function startVoiceCommand(){
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR) return alert('التعرف الصوتي غير مدعوم في المتصفح ده. اكتب الأمر في الخانة واضغط تنفيذ.');
+    const rec=new SR(); rec.lang='ar-EG'; rec.interimResults=false; rec.maxAlternatives=1;
+    const btn=event?.currentTarget; if(btn){btn.textContent='🎧';btn.disabled=true;}
+    rec.onresult=e=>{ const t=e.results[0][0].transcript; document.getElementById('voiceCommand').value=t; if(btn){btn.textContent='🎤';btn.disabled=false;} executeVoiceCommand(); };
+    rec.onerror=()=>{ if(btn){btn.textContent='🎤';btn.disabled=false;} alert('ماقدرتش أسمع الأمر. جرّب تاني أو اكتبه.'); };
+    rec.onend=()=>{ if(btn){btn.textContent='🎤';btn.disabled=false;} };
+    try{rec.start();}catch(e){if(btn){btn.textContent='🎤';btn.disabled=false;}}
+}
+
 function resetSession() {
+    if (!isCloudOnline()) { alert('التصفير النهائي متوقف أثناء الأوفلاين حتى لا يحصل تعارض مع أجهزة أخرى.'); return; }
     if (!verifyActionPassword('تصفير الطلبات')) return;
     if (!confirm('هل متأكد من تصفير كل الطلبات والعداد؟ الفاتورة الحالية لن تُحفظ في الهيستوري.')) return;
     clearCurrentSessionNoPassword(true);
@@ -1255,6 +1463,8 @@ renderActivity();
 renderInvoiceHistory();
 updateTimerDisplay();
 renderItems();
+renderQuickAdd();
+refreshConnectionStatus();
 initSharedSync();
 </script>
 
